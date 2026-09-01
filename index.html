@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Controle Juros</title>
+  <meta name="description" content="Controle de empréstimos, juros, pagamentos e cobranças." />
+  <style>
+    :root{
+      --bg:#f1f5f9; --card:#fff; --ink:#0f172a; --muted:#64748b;
+      --primary:#2563eb; --primary2:#1d4ed8; --success:#059669;
+      --danger:#dc2626; --warn:#d97706; --border:#e2e8f0; --shadow:0 10px 30px rgba(15,23,42,.08);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+    button,input,select{font:inherit}
+    .hidden{display:none!important}
+    .shell{max-width:1100px;margin:auto;padding:20px}
+    .topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .brand h1{font-size:1.45rem;margin:0}.brand small{color:var(--muted)}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{border:0;border-radius:10px;padding:11px 14px;font-weight:700;cursor:pointer}
+    .btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary2)}
+    .btn-success{background:var(--success);color:#fff}.btn-danger{background:var(--danger);color:#fff}
+    .btn-soft{background:#e2e8f0;color:var(--ink)}.btn-wpp{background:#16a34a;color:#fff}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow)}
+    .login-wrap{min-height:100vh;display:grid;place-items:center;padding:20px}
+    .login-card{width:min(430px,100%);padding:28px}
+    .login-card h1{margin:0 0 6px}.login-card p{color:var(--muted);margin:0 0 20px}
+    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:13px}
+    label{font-size:.9rem;font-weight:700}.field input{border:1px solid var(--border);border-radius:10px;padding:12px;background:#fff}
+    .pass-row{position:relative}.pass-row input{width:100%;padding-right:90px}.pass-row button{position:absolute;right:6px;top:6px;padding:6px 8px;border:0;background:#e2e8f0;border-radius:8px}
+    .msg{margin-top:12px;font-size:.9rem}.msg.error{color:var(--danger)}.msg.ok{color:var(--success)}
+    .sync{font-size:.85rem;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .stat{padding:18px}.stat span{display:block;color:var(--muted);font-size:.8rem;text-transform:uppercase}.stat strong{display:block;margin-top:6px;font-size:1.2rem}
+    .section{margin-top:16px;padding:18px}.section h2{margin:0 0 14px;font-size:1.15rem}
+    .form-grid{display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr 1fr;gap:10px}
+    .form-grid input{width:100%;border:1px solid var(--border);border-radius:9px;padding:10px}
+    .alerts{display:grid;gap:8px}.alert-item{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px;border:1px solid var(--border);border-radius:12px}
+    .badge{padding:5px 8px;border-radius:999px;font-size:.78rem;font-weight:800}.late{background:#fee2e2;color:#991b1b}.today{background:#ffedd5;color:#9a3412}.soon{background:#fef3c7;color:#92400e}.ok{background:#dcfce7;color:#166534}.paid{background:#e2e8f0;color:#334155}
+    .list{display:grid;gap:12px}.loan{padding:16px}.loan-head{display:flex;justify-content:space-between;gap:12px}.loan h3{margin:0}.loan small{color:var(--muted)}
+    .loan-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.loan-grid div{background:#f8fafc;border-radius:10px;padding:10px}.loan-grid span{display:block;font-size:.78rem;color:var(--muted)}.loan-grid strong{font-size:.95rem}
+    .loan-actions{display:flex;gap:8px;flex-wrap:wrap}
+    dialog{border:0;border-radius:16px;padding:0;max-width:520px;width:calc(100% - 30px);box-shadow:0 20px 60px rgba(0,0,0,.25)}
+    dialog::backdrop{background:rgba(15,23,42,.5)}.dialog-body{padding:20px}.dialog-body h3{margin-top:0}
+    .history-item{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+    @media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr 1fr}.loan-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:560px){.shell{padding:12px}.topbar{align-items:flex-start;flex-direction:column}.grid,.form-grid,.loan-grid{grid-template-columns:1fr}.actions{width:100%}.actions .btn{flex:1}}
+    @media print{.no-print,.loan-actions,.topbar .actions,.section.form-section{display:none!important}body{background:white}.card{box-shadow:none}}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+  <section id="loginView" class="login-wrap">
+    <div class="login-card card">
+      <h1>Controle Juros</h1>
+      <p>Entre com seu e-mail e senha cadastrados no Firebase.</p>
+      <form id="loginForm">
+        <div class="field"><label>E-mail</label><input id="loginEmail" type="email" autocomplete="email" required></div>
+        <div class="field"><label>Senha</label><div class="pass-row"><input id="loginPassword" type="password" autocomplete="current-password" required><button id="togglePass" type="button">Mostrar</button></div></div>
+        <button class="btn btn-primary" style="width:100%" type="submit">Entrar</button>
+        <div id="loginMsg" class="msg"></div>
+      </form>
+    </div>
+  </section>
+
+  <main id="appView" class="shell hidden">
+    <div class="topbar no-print">
+      <div class="brand"><h1>Controle Juros</h1><small id="userEmail"></small><div id="syncState" class="sync">Carregando...</div></div>
+      <div class="actions">
+        <button id="notifyBtn" class="btn btn-soft">Ativar notificações</button>
+        <button id="pdfBtn" class="btn btn-soft">Exportar PDF</button>
+        <button id="logoutBtn" class="btn btn-danger">Sair</button>
+      </div>
+    </div>
+
+    <section class="grid">
+      <div class="card stat"><span>Total emprestado ativo</span><strong id="stActive">R$ 0,00</strong></div>
+      <div class="card stat"><span>Saldo a receber</span><strong id="stBalance">R$ 0,00</strong></div>
+      <div class="card stat"><span>Recebido</span><strong id="stReceived">R$ 0,00</strong></div>
+      <div class="card stat"><span>Juros recebidos</span><strong id="stInterest">R$ 0,00</strong></div>
+    </section>
+
+    <section class="card section form-section no-print">
+      <h2 id="formTitle">Novo empréstimo</h2>
+      <form id="loanForm">
+        <input id="editId" type="hidden">
+        <div class="form-grid">
+          <input id="name" placeholder="Nome do cliente" required>
+          <input id="phone" placeholder="WhatsApp com DDD" required>
+          <input id="principal" type="number" step="0.01" min="0.01" placeholder="Valor R$" required>
+          <input id="interestRate" type="number" step="0.01" min="0" placeholder="Juros %" required>
+          <input id="dueDate" type="date" required>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-primary" type="submit">Salvar empréstimo</button>
+          <button id="cancelEdit" class="btn btn-soft hidden" type="button">Cancelar edição</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card section">
+      <h2>Alertas de cobrança</h2>
+      <div id="alerts" class="alerts"></div>
+    </section>
+
+    <section class="section" style="padding-left:0;padding-right:0">
+      <h2>Empréstimos e histórico</h2>
+      <div id="loans" class="list"></div>
+    </section>
+  </main>
+
+  <dialog id="payDialog"><div class="dialog-body">
+    <h3>Registrar pagamento</h3>
+    <p id="payClient"></p>
+    <div class="field"><label>Data</label><input id="payDate" type="date"></div>
+    <div class="field"><label>Tipo</label><select id="payType"><option value="interest">Juros</option><option value="principal">Abatimento do principal</option></select></div>
+    <div class="field"><label>Valor</label><input id="payAmount" type="number" step="0.01" min="0.01"></div>
+    <div style="display:flex;gap:8px"><button id="paySave" class="btn btn-success">Confirmar</button><button class="btn btn-soft" onclick="document.getElementById('payDialog').close()">Cancelar</button></div>
+  </div></dialog>
+
+  <dialog id="histDialog"><div class="dialog-body">
+    <h3 id="histTitle">Histórico</h3>
+    <div id="histList"></div>
+    <button class="btn btn-soft" style="margin-top:14px;width:100%" onclick="document.getElementById('histDialog').close()">Fechar</button>
+  </div></dialog>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBMGtdSvxffa9TpTS8Cs-Px8D6kb0vZTjM",
+  authDomain: "controle-juros.firebaseapp.com",
+  projectId: "controle-juros",
+  storageBucket: "controle-juros.firebasestorage.app",
+  messagingSenderId: "649177621428",
+  appId: "1:649177621428:web:fceb380e10a458ba6848e1"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let state = { loans: [], transactions: [], migrationCompleted: false };
+let currentUser = null;
+let payLoanId = null;
+
+const $ = (id) => document.getElementById(id);
+const brl = (v) => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0));
+const dateBR = (s) => s ? new Date(s+'T12:00:00').toLocaleDateString('pt-BR') : '-';
+const todayStr = () => new Date().toISOString().slice(0,10);
+const daysUntil = (d) => {
+  const a = new Date(); a.setHours(0,0,0,0);
+  const b = new Date(d+'T00:00:00'); b.setHours(0,0,0,0);
+  return Math.round((b-a)/86400000);
+};
+
+function loanStatus(l){
+  if(Number(l.principal)<=0) return {label:'Quitado', cls:'paid', rank:99};
+  const n=daysUntil(l.dueDate);
+  if(n<0) return {label:`Vencido há ${Math.abs(n)} dia(s)`, cls:'late', rank:0};
+  if(n===0) return {label:'Vence hoje', cls:'today', rank:1};
+  if(n===1) return {label:'Vence amanhã', cls:'soon', rank:2};
+  if(n<=3) return {label:`Vence em ${n} dias`, cls:'soon', rank:3};
+  return {label:'Em dia', cls:'ok', rank:10};
+}
+
+function normalizePhone(p){
+  let x = String(p||'').replace(/\D/g,'');
+  if(!x.startsWith('55')) x='55'+x;
+  return x;
+}
+
+function waMessage(l){
+  const msg = `Olá, ${l.name}. Passando para lembrar do seu empréstimo. Saldo atualizado: ${brl(l.principal)}. Vencimento: ${dateBR(l.dueDate)}. Se o pagamento já foi realizado, por favor desconsidere esta mensagem.`;
+  window.open(`https://wa.me/${normalizePhone(l.phone)}?text=${encodeURIComponent(msg)}`,'_blank','noopener');
+}
+
+async function loadState(){
+  const ref = doc(db,'loanApp',currentUser.uid);
+  const snap = await getDoc(ref);
+  if(snap.exists()){
+    const data=snap.data();
+    state = {loans:data.loans||[], transactions:data.transactions||[], migrationCompleted:!!data.migrationCompleted};
+  } else {
+    const oldLoans = JSON.parse(localStorage.getItem('debts')||'[]');
+    const oldTx = JSON.parse(localStorage.getItem('transactions')||'[]');
+    if(oldLoans.length || oldTx.length){
+      state = {loans:oldLoans, transactions:oldTx, migrationCompleted:true};
+      await saveState();
+    } else {
+      state = {loans:[], transactions:[], migrationCompleted:true};
+      await saveState();
+    }
+  }
+  render();
+  $('syncState').textContent='Sincronizado na nuvem (Firebase)';
+}
+
+async function saveState(){
+  if(!currentUser) return;
+  $('syncState').textContent='Sincronizando...';
+  await setDoc(doc(db,'loanApp',currentUser.uid),{
+    loans:state.loans,
+    transactions:state.transactions,
+    migrationCompleted:true,
+    updatedAt:serverTimestamp()
+  },{merge:true});
+  $('syncState').textContent='Sincronizado na nuvem (Firebase)';
+}
+
+function render(){
+  const active = state.loans.filter(l=>Number(l.principal)>0);
+  const activeTotal = active.reduce((s,l)=>s+Number(l.originalPrincipal||l.principal||0),0);
+  const balance = active.reduce((s,l)=>s+Number(l.principal||0),0);
+  const received = state.transactions.reduce((s,t)=>s+Number(t.amount||0),0);
+  const interests = state.transactions.filter(t=>t.type==='interest').reduce((s,t)=>s+Number(t.amount||0),0);
+  $('stActive').textContent=brl(activeTotal); $('stBalance').textContent=brl(balance); $('stReceived').textContent=brl(received); $('stInterest').textContent=brl(interests);
+
+  const alertLoans=[...active].sort((a,b)=>loanStatus(a).rank-loanStatus(b).rank).filter(l=>loanStatus(l).rank<=3);
+  $('alerts').innerHTML = alertLoans.length ? alertLoans.map(l=>{
+    const s=loanStatus(l);
+    return `<div class="alert-item"><div><strong>${esc(l.name)}</strong><br><small>${brl(l.principal)} • ${dateBR(l.dueDate)} • ${esc(l.phone)}</small></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="badge ${s.cls}">${s.label}</span><button class="btn btn-wpp" data-wa="${l.id}">WhatsApp</button></div></div>`;
+  }).join('') : '<p style="color:var(--muted)">Nenhum vencimento próximo.</p>';
+
+  $('loans').innerHTML = state.loans.length ? state.loans.map(l=>{
+    const s=loanStatus(l), int=Number(l.principal)*Number(l.interestRate||0)/100;
+    return `<article class="card loan">
+      <div class="loan-head"><div><h3>${esc(l.name)}</h3><small>${esc(l.phone)}</small></div><span class="badge ${s.cls}">${s.label}</span></div>
+      <div class="loan-grid">
+        <div><span>Saldo atual</span><strong>${brl(l.principal)}</strong></div>
+        <div><span>Juros mensal (${Number(l.interestRate||0)}%)</span><strong>${brl(int)}</strong></div>
+        <div><span>Vencimento</span><strong>${dateBR(l.dueDate)}</strong></div>
+        <div><span>Valor inicial</span><strong>${brl(l.originalPrincipal||l.principal)}</strong></div>
+      </div>
+      <div class="loan-actions no-print">
+        ${Number(l.principal)>0?`<button class="btn btn-success" data-pay="${l.id}">Pagar</button><button class="btn btn-wpp" data-wa="${l.id}">Cobrar WhatsApp</button>`:''}
+        <button class="btn btn-soft" data-hist="${l.id}">Histórico</button>
+        <button class="btn btn-soft" data-edit="${l.id}">Editar</button>
+        <button class="btn btn-danger" data-del="${l.id}">Excluir</button>
+      </div>
+    </article>`;
+  }).join('') : '<div class="card section"><p style="color:var(--muted)">Nenhum empréstimo cadastrado.</p></div>';
+
+  document.querySelectorAll('[data-wa]').forEach(b=>b.onclick=()=>waMessage(state.loans.find(l=>l.id===b.dataset.wa)));
+  document.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>openPay(b.dataset.pay));
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editLoan(b.dataset.edit));
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deleteLoan(b.dataset.del));
+  document.querySelectorAll('[data-hist]').forEach(b=>b.onclick=()=>openHistory(b.dataset.hist));
+}
+
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+
+$('loanForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const id=$('editId').value;
+  const data={name:$('name').value.trim(),phone:normalizePhone($('phone').value),principal:Number($('principal').value),interestRate:Number($('interestRate').value),dueDate:$('dueDate').value};
+  if(id){
+    const i=state.loans.findIndex(l=>l.id===id); state.loans[i]={...state.loans[i],...data};
+  }else{
+    state.loans.push({id:crypto.randomUUID(),...data,originalPrincipal:data.principal,createdAt:new Date().toISOString()});
+  }
+  resetForm(); await saveState(); render();
+});
+function resetForm(){$('loanForm').reset();$('editId').value='';$('formTitle').textContent='Novo empréstimo';$('cancelEdit').classList.add('hidden')}
+$('cancelEdit').onclick=resetForm;
+
+function editLoan(id){
+  const l=state.loans.find(x=>x.id===id); if(!l)return;
+  $('editId').value=id;$('name').value=l.name;$('phone').value=l.phone;$('principal').value=l.principal;$('interestRate').value=l.interestRate;$('dueDate').value=l.dueDate;
+  $('formTitle').textContent='Editar empréstimo';$('cancelEdit').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});
+}
+async function deleteLoan(id){
+  if(!confirm('Excluir este empréstimo e todo o histórico dele?'))return;
+  state.loans=state.loans.filter(l=>l.id!==id);state.transactions=state.transactions.filter(t=>t.loanId!==id&&t.debtId!==id);await saveState();render();
+}
+function openPay(id){
+  payLoanId=id; const l=state.loans.find(x=>x.id===id); $('payClient').textContent=`Cliente: ${l.name}`;$('payDate').value=todayStr();$('payType').value='interest';$('payAmount').value=(Number(l.principal)*Number(l.interestRate||0)/100).toFixed(2);$('payDialog').showModal();
+}
+$('payType').onchange=()=>{
+  const l=state.loans.find(x=>x.id===payLoanId);
+  $('payAmount').value=$('payType').value==='interest'?(Number(l.principal)*Number(l.interestRate||0)/100).toFixed(2):'';
+};
+$('paySave').onclick=async()=>{
+  const l=state.loans.find(x=>x.id===payLoanId); const type=$('payType').value, amount=Number($('payAmount').value), date=$('payDate').value;
+  if(!l||!amount||amount<=0||!date)return alert('Preencha os dados do pagamento.');
+  if(type==='principal') l.principal=Math.max(0,Number(l.principal)-amount);
+  state.transactions.push({id:crypto.randomUUID(),loanId:l.id,debtId:l.id,type,amount,date,createdAt:new Date().toISOString()});
+  $('payDialog').close(); await saveState(); render();
+};
+
+function openHistory(id){
+  const l=state.loans.find(x=>x.id===id); const tx=state.transactions.filter(t=>(t.loanId||t.debtId)===id).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  $('histTitle').textContent=`Histórico de ${l.name}`;
+  $('histList').innerHTML=tx.length?tx.map(t=>`<div class="history-item"><div><strong>${t.type==='interest'?'Juros':'Abatimento'}</strong><br><small>${dateBR(t.date)}</small></div><strong>${brl(t.amount)}</strong></div>`).join(''):'<p>Nenhum pagamento registrado.</p>';
+  $('histDialog').showModal();
+}
+
+$('loginForm').addEventListener('submit',async e=>{
+  e.preventDefault(); $('loginMsg').textContent='Entrando...'; $('loginMsg').className='msg';
+  try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value);$('loginMsg').textContent='';}
+  catch(err){$('loginMsg').textContent='E-mail ou senha inválidos.';$('loginMsg').className='msg error';}
+});
+$('togglePass').onclick=()=>{const p=$('loginPassword');p.type=p.type==='password'?'text':'password';$('togglePass').textContent=p.type==='password'?'Mostrar':'Ocultar'};
+$('logoutBtn').onclick=()=>signOut(auth);
+
+onAuthStateChanged(auth,async user=>{
+  currentUser=user;
+  if(user){
+    $('loginView').classList.add('hidden');$('appView').classList.remove('hidden');$('userEmail').textContent=user.email||'';
+    try{await loadState();checkNotifications();}catch(e){$('syncState').textContent='Erro ao sincronizar com o Firebase';console.error(e)}
+  }else{
+    $('appView').classList.add('hidden');$('loginView').classList.remove('hidden');
+  }
+});
+
+$('notifyBtn').onclick=async()=>{
+  if(!('Notification' in window)) return alert('Este navegador não suporta notificações.');
+  const p=await Notification.requestPermission();
+  if(p==='granted'){localStorage.setItem('notificationsEnabled','1');checkNotifications(true);alert('Notificações ativadas.');}
+  else alert('Permissão de notificação não foi concedida.');
+};
+function checkNotifications(force=false){
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  const key='notify-'+todayStr()+'-'+(currentUser?.uid||'');
+  if(!force && localStorage.getItem(key))return;
+  const due=state.loans.filter(l=>Number(l.principal)>0 && loanStatus(l).rank<=3);
+  if(due.length) new Notification('Controle Juros',{body:`Você tem ${due.length} cobrança(s) vencida(s) ou próximas do vencimento.`});
+  localStorage.setItem(key,'1');
+}
+
+$('pdfBtn').onclick=()=>{
+  const {jsPDF}=window.jspdf; const docPdf=new jsPDF();
+  docPdf.setFontSize(18);docPdf.text('Controle de Empréstimos',14,16);
+  docPdf.setFontSize(10);docPdf.text('Emitido em: '+new Date().toLocaleString('pt-BR'),14,23);
+  const active=state.loans.filter(l=>Number(l.principal)>0), balance=active.reduce((s,l)=>s+Number(l.principal),0), received=state.transactions.reduce((s,t)=>s+Number(t.amount),0), interest=state.transactions.filter(t=>t.type==='interest').reduce((s,t)=>s+Number(t.amount),0), principalPaid=state.transactions.filter(t=>t.type==='principal').reduce((s,t)=>s+Number(t.amount),0), overdue=active.filter(l=>daysUntil(l.dueDate)<0).length;
+  docPdf.autoTable({startY:29,head:[['Resumo','Valor']],body:[
+    ['Saldo a receber',brl(balance)],['Total recebido',brl(received)],['Juros recebidos',brl(interest)],['Abatimentos',brl(principalPaid)],['Empréstimos ativos',String(active.length)],['Empréstimos vencidos',String(overdue)]
+  ]});
+  let y=docPdf.lastAutoTable.finalY+8;
+  docPdf.autoTable({startY:y,head:[['Cliente','Telefone','Inicial','Saldo','Juros','Vencimento','Status']],body:state.loans.map(l=>[l.name,l.phone,brl(l.originalPrincipal||l.principal),brl(l.principal),`${l.interestRate}%`,dateBR(l.dueDate),loanStatus(l).label])});
+  y=docPdf.lastAutoTable.finalY+8;
+  const tx=state.transactions.map(t=>{const l=state.loans.find(x=>x.id===(t.loanId||t.debtId));return [l?.name||'-',dateBR(t.date),t.type==='interest'?'Juros':'Abatimento',brl(t.amount)]});
+  if(tx.length) docPdf.autoTable({startY:y,head:[['Cliente','Data','Tipo','Valor']],body:tx});
+  docPdf.save('controle-juros.pdf');
+};
+</script>
+</body>
+</html>
